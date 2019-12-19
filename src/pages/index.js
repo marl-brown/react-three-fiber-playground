@@ -1,69 +1,142 @@
-import React, { useState, useRef, useEffect } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls"
+// import { TrackballControls } from "three/examples/jsm/controls/TrackballControls"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader"
-import { Canvas, extend, useThree, useRender } from "react-three-fiber"
+import { Canvas, useFrame, extend, useThree } from "react-three-fiber"
+// import { Canvas, extend, useThree, useRender } from "react-three-fiber"
 import { useSpring, a } from "react-spring/three"
 
 import "./style.css"
 
+
+// Wolf by -- Aleksandr Bessarabov
 extend({ OrbitControls })
 
-const SpaceShip = () => {
+const Person = ({parentRef}) => {
   const [model, setModel] = useState()
+  const clock = useRef(new THREE.Clock());
+  const mixer = useRef();
+  const ref = useRef();
 
   useEffect(() => {
-    new GLTFLoader().load("/scene.gltf", setModel)
+    new GLTFLoader().load("/ruby_rose/scene.gltf", setModel)
+  }, [])
+
+  useEffect(() => {
+    if(model && model.scene) {
+      mixer.current = new THREE.AnimationMixer(model.scene);
+      const action = mixer.current.clipAction(model.animations[0])
+      action.play();
+  }
+  }, [model])
+
+   useFrame(() => {
+    if (mixer.current) {
+      const delta = clock.current.getDelta() / 2;
+      mixer.current.update(delta);
+    }
+
+    if (parentRef && parentRef.current) {
+      if (parentRef.current.position.x > -10 && parentRef.current.position.x < 0 && ref.current.position.y < -2.0) {
+        ref.current.position.y += 0.1
+      }
+
+      if (parentRef.current.position.x > 0 && parentRef.current.position.x < 10 && ref.current.position.y > -3.8) {
+        ref.current.position.y -= 0.1
+      }
+    }
+   })
+
+  return model ? (
+    <primitive object={model.scene} position={[0, -3.8, 0]} scale={[0.05, 0.05, 0.05]} ref={ref} />
+  ) : null
+}
+
+const SkateBoard = ({parentRef}) => {
+  const [model, setModel] = useState()
+  const ref = useRef();
+
+  useFrame(() => {
+    if (parentRef && parentRef.current) {
+      if (parentRef.current.position.x > -10 && parentRef.current.position.x < 10 && ref.current.rotation.x < Math.PI * 2) {
+        ref.current.rotation.x += 0.05
+      }
+    }
+    if (parentRef.current.position.x > 10) {
+      ref.current.rotation.x = 0
+    }
+   })
+
+
+  useEffect(() => {
+    new GLTFLoader().load("/skateboard/scene.gltf", setModel)
+  }, [])
+
+  return model ? (
+    <primitive object={model.scene} position={[1, -4, -0.5]} scale={[1, 1, 1]} ref={ref} />
+  ) : null
+}
+
+const Group = () => {
+  const ref = useRef();
+
+  useFrame(() => {
+    if(ref.current.position.x < 20) {
+      ref.current.position.x += 0.1
+      if (ref.current.position.x > -10 && ref.current.position.x < 0 && ref.current.position.y < 1) {
+        ref.current.position.y += 0.1
+      }
+
+      if (ref.current.position.x > 0 && ref.current.position.x < 10 && ref.current.position.y > 0) {
+        ref.current.position.y -= 0.1
+      }
+    } else {
+      ref.current.position.x = -20
+    }
   })
 
-  return model ? <primitive object={model.scene} /> : null
+  return (
+    <group position={[-20, 0, 0]} ref={ref}>
+      <Person parentRef={ref} />
+      <SkateBoard parentRef={ref} />
+    </group>
+  );
 }
 
 const Controls = () => {
-  const orbitRef = useRef()
-  const { camera, gl } = useThree()
+  const { camera, gl } = useThree();
+  const orbitControlsRef = useRef();
 
-  useRender(() => {
-    orbitRef.current.update()
+  useFrame(() => {
+    orbitControlsRef.current.update()
   })
 
   return (
     <orbitControls
-      autoRotate
-      maxPolarAngle={Math.PI / 3}
-      minPolarAngle={Math.PI / 3}
       args={[camera, gl.domElement]}
-      ref={orbitRef}
+      ref={orbitControlsRef}
+      maxPolarAngle={Math.PI / 2}
+      minPolarAngle={Math.PI / 3}
     />
   )
 }
 
-const Plane = () => (
-  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
-    <planeBufferGeometry attach="geometry" args={[100, 100]} />
-    <meshPhysicalMaterial attach="material" color="white" />
-  </mesh>
-)
+const Plane = () => {
+  const [model, setModel] = useState()
+  useEffect(() => {
+    new THREE.TextureLoader().load("/UV-indoor-map/WM_IndoorWood-44_1024.png", setModel)
+  }, [])
 
-const Box = () => {
-  const [hovered, setHovered] = useState(false)
-  const [active, setActive] = useState(false)
-  const props = useSpring({
-    scale: active ? [1.5, 1.5, 1.5] : [1, 1, 1],
-    color: hovered ? "hotpink" : "gray",
-  })
+  console.log(model)
 
   return (
-    <a.mesh
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
-      onClick={() => setActive(!active)}
-      scale={props.scale}
-      castShadow
-    >
-      <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
-      <a.meshPhysicalMaterial attach="material" color={props.color} />
-    </a.mesh>
+    <mesh rotation={[Math.PI * 1.5, 0, 0]} position={[0, -5, -10]}>
+      <planeBufferGeometry attach="geometry" args={[100, 100]} />
+      <meshPhysicalMaterial attach="material" color={'rebeccapurple'} roughness={1} metalness={1}>
+        <texture attach="map" image={model} onUpdate={self => model && (self.needsUpdate = true)}/>
+      </meshPhysicalMaterial>
+    </mesh>
   )
 }
 
@@ -71,25 +144,18 @@ export default () => {
   const isBrowser = typeof window !== "undefined"
 
   return (
-    <>
-      <h1>Hello everyone!</h1>
-      {isBrowser && (
-        <Canvas
-          camera={{ position: [0, 0, 5] }}
-          onCreated={({ gl }) => {
-            gl.shadowMap.enabled = true
-            gl.shadowMap.type = THREE.PCFSoftShadowMap
-          }}
-        >
-          <ambientLight intensity={0.5} />
-          <spotLight position={[15, 20, 5]} penumbra={1} castShadow />
-          <fog attach="fog" args={["black", 10, 25]} />
-          <Controls />
-          {/* <Box /> */}
-          {/* <Plane /> */}
-          <SpaceShip />
-        </Canvas>
-      )}
-    </>
-  )
+  isBrowser ? <Canvas
+    camera={{ position: [0, 0, 10]}}
+    onCreated={({scene, gl}) => {
+      scene.background =  new THREE.Color( 0x8FBCD4 );
+      gl.shadowMap.enabled = true
+      gl.shadowMap.type = THREE.PCFSoftShadowMap
+    }}
+  >
+    <ambientLight intensity={1} color={'#927575'} />
+    <spotLight position={[0, 10, 35]} castShadow intensity={2} />
+    <Controls />
+    <Group />
+    <Plane />
+  </Canvas> : null);
 }
